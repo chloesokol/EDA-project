@@ -1,0 +1,519 @@
+---
+title: "Exploratory Data Analysis of World Health Organization - World Health Statistics 2021"
+subtitle: "Data Science I (STAT 301-1)"
+author: "Chloe Sokol"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    highlight: "tango"
+    code_folding: show
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(
+  warning = FALSE, comment = FALSE, message = FALSE
+)
+```
+
+## Overview
+The data set is sourced from the World Health Organization and represents WHO’s annual World Health Statistics report for the 194 WHO member states in 2021, though most of the data falls under a previous year. The dataset was found on the WHO website within the Global Health Observatory. For 2021, they have a full report as well as a visual summary in addition to the raw .xls file. (https://www.who.int/data/gho/publications/world-health-statistics)
+<br><br>
+
+```{r, echo=FALSE}
+# Loading package(s)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(skimr)
+library(janitor)
+library(lvplot)
+library(readr)
+library(readxl)
+library(wesanderson)
+library(viridis)
+library(yarrr)
+
+# Dataset
+whs <- read_excel("data/processed/whs2021.xlsx")
+```
+
+## Missing Data
+In this data set there is one character variable (member_state) and 63 numeric variables. "member_state" has no missing values and covers all 194 WHO member states, 6 regions of those member states, and a global object to make 201 unique observations. Most variables in this data set, besides "member_state", "pop_both19" (the combined male and female population), "NTDs19" (the number of people requiring interventions against NTDs), and "DTP319" (Diphtheria-tetanus-pertussis (DTP3) immunization coverage among 1-year-olds), are missing at least one observation. 8 variables are missing over 100 observations, meaning they are missing data for over half of the member states/regions. "health_facilities11_19" (proportion of health facilities with a core set of relevant essential medicines available and affordable on a sustainable basis) is missing the most number of observations, 178, meaning that it is missing about 89% of its data. Overall, there does not seem to be a pattern with which observations are missing for certain member states/regions. Most variables are only evaluated in this EDA for the 6 member state region observations, which are most often available unless stated as missing in the appropriate section. Variables with over 80% of observations missing are noted to be as such and those with over 50% of observation missing are not evaluated over all observations within said variable.
+
+## Life Expectancy and Healthy Life Expectancy at Birth
+```{r, echo=FALSE}
+regions <- whs %>%
+  filter(str_detect(member_state, "Region"))
+
+life_stat <- gather(regions, key="measure", value="value", c("life_both19", "healthy_life_both19"))
+
+ggplot(life_stat, aes(x=member_state, y=value))+
+  geom_bar(stat='identity', aes(fill = factor(member_state))) +
+  facet_wrap(~ measure) +
+  coord_flip() +
+  theme(legend.position = "none") +
+  labs(title = "Life Expectancy vs Healthy Life Expectancy At Birth") +
+  ylab("Years") + xlab("Region")
+```
+<br><br>
+The life expectancy (in years) at birth is highest for the European region (78.2), then the Western Pacific region (77.7), the region of the Americas (77.2), the Southeast Asia region (71.4), the East Mediterranean region (69.7), and finally, the African Region (64.5).
+<br><br>
+The healthy life expectancy (in years) at birth is highest for the Western Pacific region (68.6), then the European region (68.3), the region of the Americas (66.2), the Southeast Asia region (61.5), the Eastern Mediterranean region (60.4), and finally, the African Region (56.0).
+<br><br>
+It is interesting that the average healthy life expectancy for each region is lower than the the average standard life expectancy. This may be due to a smaller proportion of people who qualify as having a "healthy lifestyle" leading to a lower chance of high outlying values which increase the mean. Though one would expect a healthier person to live longer, sometimes unhealthy people live a very long life by chance.
+<br><br>
+
+## Top/Bottom Countries - Life Expectancy and Healthy Life Expectancy at Birth
+```{r, echo=FALSE}
+# Top 5 Countries - Life Expectancy at Birth
+whs %>%
+  select(member_state, life_both19) %>%
+  filter(!is.na(life_both19)) %>%
+  arrange(desc(life_both19)) %>%
+  head(5)
+
+# Bottom 5 Countries - Life Expectancy at Birth
+whs %>%
+  select(member_state, life_both19) %>%
+  filter(!is.na(life_both19)) %>%
+  arrange(life_both19) %>%
+  head(5)
+
+# Top 5 Countries - Healthy Life Expectancy at Birth
+whs %>%
+  select(member_state, healthy_life_both19) %>%
+  filter(!is.na(healthy_life_both19)) %>%
+  arrange(desc(healthy_life_both19)) %>%
+  head(5)
+
+# Bottom 5 Countries - Healthy Life Expectancy at Birth
+ whs %>%
+  select(member_state, healthy_life_both19) %>%
+  filter(!is.na(healthy_life_both19)) %>%
+  arrange(healthy_life_both19) %>%
+  head(5)
+```
+<br><br>
+The top 5 countries with the highest life expectancies (in years) at birth are Japan (84.3), Switzerland (83.4), the Republic of Korea (83.3), Singapore (83.2), and Spain (83.2). These are consistent with the European and Western Pacific regions having the highest life expectancies at birth. The 5 countries with the lowest life expectancies (in years) at birth are Lesotho (50.7), the Central African Republic (53.1), Somalia (56.5), Eswatini (57.7), and Mozambique (58.1). These are consistent with the African region having the lowest life expectancy at birth.
+<br><br>
+The top 5 countries with the highest healthy life expectancies (in years) at birth are Japan (74.1), Singapore (73.6), the Republic of Korea (73.1), Switzerland (72.5), and Cyprus (72.4). These are mostly consistent with the European and Western Pacific regions having the highest healthy life expectancies at birth, except the Eastern Mediterranean region, where Cyprus is located, had the second to lowest healthy life expectancy. The 5 countries with the lowest healthy life expectancies (in years) at birth are, again, Lesotho (44.2), the Central African Republic (46.4), Somalia (49.7), Eswatini (50.1), and Mozambique (50.4). These are consistent with the African region having the lowest healthy life expectancy at birth. 
+<br><br>
+
+## Female Health and Birth-Realted Mortality
+```{r, echo=FALSE}
+ggplot(regions, aes(x=member_state, y=birth_skilled11_20))+
+  geom_bar(stat='identity', aes(fill = factor(member_state))) + 
+  coord_flip() +
+  theme(legend.position = "none") +
+  scale_fill_viridis_d(option = "plasma") + 
+  labs(title = "Proportion of Births Attended by Skilled Health Personnel") +
+  ylab("Percent") + xlab("Region") 
+
+ggplot(regions, aes(x=member_state, y=maternal_mortality17)) +
+  geom_bar(stat='identity', aes(fill = factor(member_state))) + 
+  coord_flip() + 
+  theme(legend.position = "none") +
+  scale_fill_viridis_d() + 
+  labs(title = "Maternal Mortality") +
+  ylab("Ratio (Per 100,000 Live Births)") + xlab("Region")
+
+ggplot(regions, aes(x=member_state, y=neonatal_mortality19))+
+  geom_bar(stat='identity', aes(fill = factor(member_state))) + 
+  coord_flip() +
+  theme(legend.position = "none") +
+  scale_fill_viridis_d(option = "inferno") +
+  labs(title = "Neonatal Mortality") +
+  ylab("Ratio (Per 1000 Live Births)") + xlab("Region")
+```
+<br><br>
+The percent of births attended by skilled health professionals is highest in the European region (99%), then the Western Pacific Region (98%), the Region of the Americas (96%), the Southeast Asia region and the Eastern Mediterranean region (81%), and finally, the African region (65%).
+<br><br>
+The highest ratio of maternal mortality per 100,000 live births is the African region (525), followed by the Eastern Mediterranean region (164), the Southeast Asia region (152), the region of the Americas (57), the Western Pacific region (41), and finally, the European region (13). 
+<br><br>
+The highest ratio of neonatal mortality per 1,000 live births is the African region (27), followed by the Eastern Mediterranean region (25), the Southeast Asia region (20), the region of the Americas (7), the Western Pacific region (6), and finally, the European region (4).
+<br><br>
+```{r, echo=FALSE}
+whs %>%
+  ggplot(aes(x = birth_skilled11_20, y = maternal_mortality17)) +
+  geom_point() +
+  labs(title = "Skilled Health Personnel Attended Births and Maternal Mortality") +
+  xlab("% of Births Attended by Skilled Health Personnel") + ylab("Maternal Mortality Ratio (Per 100,000 Live Births)")
+
+whs %>%
+  ggplot(aes(x = birth_skilled11_20, y = neonatal_mortality19)) +
+  geom_point() + 
+  labs(title = "Skilled Health Personnel Attended Births and Neonatal Mortality") +
+  xlab("% of Births Attended by Skilled Health Personnel") + ylab("Neonatal Mortality Ratio (Per 1000 Live Births)")
+```
+There appears to be a weekly negative relationship between the percent of births attended by skilled health personnel and both neonatal and maternal mortality rates. As the proportion of professionally attended births rise, the mortality rates decrease.
+<br><br>
+
+## Under 5 Stunting, Wasting, and Overweight
+```{r, echo=FALSE}
+u5_stat <- gather(regions, key="measure", value="value", c("u5_stunting20", "u5_wasting11_20", "u5_overweight20"))
+
+ggplot(u5_stat, aes(x=member_state, y=value))+
+  geom_bar(stat='identity', aes(fill = factor(member_state))) +
+  facet_wrap(~ measure) +
+  coord_flip() +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = wes_palette("IsleofDogs1", n = 6)) + 
+  labs(title = "u5 Stunting, Wasting, And Overweight Proportions") +
+  ylab("Percent") + xlab("Region")
+```
+<br><br>
+The prevalence of overweight in children under 5 years old is highest for the region of the Americas (8.0%), then the European region (7.9%), the Eastern Mediterranean region (7.7%), the Western Pacific region (7.5%), the African region (4.2%), and finally, the Southeast Asia region (3.3%).
+<br><br>
+The prevalence of wasting in children under 5 years old is highest for the Southeast Asia region (14.5%), then the Eastern Mediterranean (7.4%), the African region (5.8%), the Western Pacific region (2.1%), and finally, the region of the Americas (0.7%). The data for the European region is unavailable. 
+<br><br>
+The prevalence of stunting in children under 5 is highest for the African region (31.7%), then the Southeast Asia region (30.1%), the Eastern Mediterranean region (26.2%), the Western Pacific region (9.3%), the region of the Americas (8.9%), and finally, the European region (5.7%). 
+<br><br>
+Stunting and wasting are associated with under-nutrition, while overweight is not. The African, Eastern Mediterranean, and Southeast Asia has the highest percentages for stunting and wasting in children under 5 years old, while those same regions mostly flip order for the prevalence of overweight in children under 5 years old. It is interesting that the European region is missing data on wasting, considering it has data on the two other child-health-related variables in the data set.
+<br><br>
+
+## Under 5 and Neonatal Mortality Rates
+```{r, echo=FALSE}
+child_mortality_stat <- gather(regions, key="measure", value="value", c("u5_mortality19", "neonatal_mortality19"))
+
+ggplot(child_mortality_stat, aes(x=member_state, y=value))+
+  geom_bar(stat='identity', aes(fill = factor(member_state))) +
+  facet_wrap(~ measure) +
+  coord_flip() +
+  theme(legend.position = "none") +
+  scale_fill_viridis_d(option = "inferno") +
+  labs(title = "Neonatal and Under 5 Mortality Rate") +
+  ylab("Rate (Per 1000 Live Births)") + xlab("Region")
+```
+<br><br>
+The regions with the highest under-five mortality rate (per 1000 live births) are the African region (74), followed by the Eastern Mediterranean region (46), the Southeast Asia region (32), the region of the Americas (13), the Western Pacific region (11), and finally, the European region (8).
+<br><br>
+The regions with the highest neonatal mortality rate (per 1000 live births) are the African region (27), followed by the Eastern Mediterranean region (25), the Southeast Asia region (20), the region of the Americas (7), the Western Pacific region (6), and finally, the European region (4).
+<br><br>
+The order of regions from highest to lowest rate for both under-five and neonatal mortality is the same, but for under-five mortality, the African region is much further away from the other data points than with neonatal mortality.
+<br><br>
+
+## Child and Adult Obesity
+```{r, echo=FALSE}
+obesity_stat <- gather(regions, key="measure", value="value", c("child_obesity16", "adult_obesity16"))
+
+ggplot(obesity_stat, aes(x=member_state, y=value))+
+  geom_bar(stat='identity', aes(fill = factor(member_state))) +
+  facet_wrap(~ measure) +
+  coord_flip() +
+  theme(legend.position = "none") +
+  scale_fill_viridis_d(option = "plasma") + 
+  labs(title = "Obesity Among Adults and Children") +
+  ylab("Percent") + xlab("Region")
+```
+The region with the highest prevalence of obesity among children and adolescents (5–19 years) is the region of the Americas (14.4%), followed by the Western Pacific region (9.8%), the European region (8.6%), the Eastern Mediterranean region (8.2%), the Southeast Asia region (3.0%), and finally, the African region (2.8%).
+<br><br>
+The region with the highest age-standardized prevalence of obesity among adults (18+) is the region of the Americas (28.6), followed by the European region (23.3%), the Eastern Mediterranean region (20.8%), the African region (10.6%), the Western Pacific region (6.4%), and finally, the Southeast Asia region (4.7%).
+<br><br>
+
+## Substance Use
+```{r, echo=FALSE}
+regions %>%
+  ggplot(aes(x = member_state, y = acohol_per_capital19)) + 
+  geom_bar(stat='identity', aes(fill = factor(member_state))) +
+  coord_flip() + 
+  theme(legend.position = "none") +
+  scale_fill_manual(values = wes_palette("BottleRocket1", n = 6)) +  
+  labs(title = "Total Alcohol Per Capita (≥ 15 years of age) Consumption") +
+  ylab("Liters of Pure Alcohol") + xlab("Region")
+
+regions %>%
+  ggplot(aes(x = member_state, y = u15_tobacco18)) + 
+  geom_bar(stat='identity', aes(fill = factor(member_state))) +
+  coord_flip() + 
+  theme(legend.position = "none") +
+  scale_fill_manual(values = wes_palette("BottleRocket1", n = 6)) +
+  labs(title = "Tobacco Use Among Persons 15 Years and Older") +
+  ylab("Percent") + xlab("Region")
+```
+The region with the highest total alcohol per capita (≥ 15 years of age) consumption in liters of pure alcohol is the European region (9.5), followed by the region of Americas (7.6), the Western Pacific region (6.5), the African region (4.8), the Southeast Asia region (4.3), and finally, the Eastern Mediterranean region (0.5). 
+<br><br>
+The region with the highest age-standardized prevalence of tobacco use among persons 15 years and older (%) is Southeast Asia region (29.1%), followed by the European and Western Pacific regions (26.3%), the Eastern Mediterranean region (19.3%), the region of the Americas (18.6%), and finally, the African region (12.7%).
+<br><br>
+The order of these countries from highest to lowest tobacco use and alcohol consumption is very much influenced by the cultural and legal differences between countries within these regions. For example, the age range for total alcohol per capita consumption may be higher in Europe than the Americas because the legal drinking age is higher in the United States than in France, for example. Additionally, tobacco consumption is something widely advised against for US schools and media, whereas is other countries in other regions it is much more socially acceptable.
+<br><br>
+
+## Communicable Diseases
+```{r, echo=FALSE}
+regions %>%
+  ggplot(aes(x = member_state, y = new_HIV2019)) + 
+  geom_bar(stat='identity', aes(fill = factor(member_state))) +
+  coord_flip() + 
+  theme(legend.position = "none") +
+  scale_fill_manual(values = wes_palette("IsleofDogs1", n = 6)) +  
+  labs(title = "New HIV Infections") +
+  ylab("Per 1,000 Uninfected Population") + xlab("Region")
+
+regions %>%
+  ggplot(aes(x = member_state, y = tuberculosis19)) + 
+  geom_bar(stat='identity', aes(fill = factor(member_state))) +
+  coord_flip() + 
+  theme(legend.position = "none") +
+  scale_fill_manual(values = wes_palette("IsleofDogs1", n = 6)) + 
+  labs(title = "Tuberculosis Incidence") +
+  ylab("Per 100,000 Population") + xlab("Region")
+
+regions %>%
+  ggplot(aes(x = member_state, y = malaria19)) + 
+  geom_bar(stat='identity', aes(fill = factor(member_state))) +
+  coord_flip() + 
+  theme(legend.position = "none") +
+  scale_fill_manual(values = wes_palette("IsleofDogs1", n = 6)) +  
+  labs(title = "Malaria Incidence") +
+  ylab("Per 1000 Population at Risk") + xlab("Region")
+```
+<br><br>
+The region with the highest amount of new HIV infections (per 1,000 uninfected population) is the African region (0.94), followed by the European region (0.21), the region of the Americas (0.17), the Southeast Asia region (0.08), the Eastern Mediterranean region (0.07), and finally, the Western Pacific region (0.06).
+<br><br>
+The region with the highest amount of tuberculosis incidences (per 100,000 population) is the African region (226), followed by the Southeast Asia region (217), the Eastern Mediterranean region (114), the Western Pacific region (93), the region of the Americas (29), and finally, the European region (26).
+<br><br>
+The region with the highest amount of malaria incidences (per 1,000 population at risk) is the African region (225.2), followed by the eastern Mediterranean region (10.4), the region of the Americas (6.4), the Southeast Asia region (3.9), the Western Pacific region (2.3), and finally, the European region (0.0).
+<br><br>
+
+## DTP3, MCV219, and PCV3 Immunization Coverage 
+```{r, echo=FALSE}
+immune_stat <- gather(regions, key="measure", value="value", c("DTP319", "MCV219", "PCV319"))
+
+ggplot(immune_stat, aes(x=member_state, y=value))+
+  geom_bar(stat='identity', aes(fill = factor(member_state))) +
+  facet_wrap(~ measure) +
+  coord_flip() +
+  theme(legend.position = "none") +
+  scale_fill_viridis_d(option = "inferno") +
+  labs(title = "Immunization Coverage") +
+  ylab("Percent") + xlab("Region")
+```
+The region with the highest diphtheria-tetanus-pertussis (DTP3) immunization coverage among 1-year-olds is the European region (95%), followed by the Western Pacific region (94%), the Southeast Asia region (91%), the region of the Americas (84%), the Eastern Mediterranean region (82%), and finally, the African region (74%).
+<br><br>
+The region with the highest measles-containing-vaccine second-dose (MCV2) immunization coverage by the nationally recommended age is the European region (92%), followed by the Western Pacific region (91%), the Southeast Asia region (83%), the Eastern Mediterranean region and the region of the Americas (75%), and finally, the African region (33%).
+<br><br>
+The region with the highest pneumococcal conjugate 3rd dose (PCV3) immunization coverage among 1-year olds is the region of the Americas (83%), followed by the European region (80%), the African region (70%), the Eastern Mediterranean region (52%), the Southeast Asia region (23%), and finally, the Western Pacific region (14%).
+<br><br>
+```{r, echo=FALSE}
+whs %>%
+  ggplot(aes(x = DTP319, y = u5_mortality19)) +
+  geom_point() + 
+  labs(title = "DTP3 Immunization for 1-Year-Olds and u5 Mortality") +
+  xlab("% of DTP3 Immunization Coverage Among 1-Year-Olds") + ylab("Under 5 Mortality Ratio (Per 1000 Live Births)")
+
+whs %>%
+  ggplot(aes(x = MCV219, y = u5_mortality19)) +
+  geom_point() + 
+  labs(title = "MCV2 Immunization for Nationally Recommended Age and u5 Mortality") +
+  xlab("% of MCV2 Immunization Coverage for the Nationally Recommended Age") + ylab("Under 5 Mortality Ratio (Per 1000 Live Births)")
+
+whs %>%
+  ggplot(aes(x = PCV319, y = u5_mortality19)) +
+  geom_point() + 
+  labs(title = "PCV3 Immunization for 1-Year-Olds and u5 Mortality") +
+  xlab("% of PCV3 Immunization Coverage Among 1-Year Olds") + ylab("Under 5 Mortality Ratio (Per 1000 Live Births)")
+```
+<br><br>
+The order, in terms of regions with the highest vaccination coverage for both diphtheria-tetanus-pertussis among 1-year olds and measles-containing-vaccine second-dose (which is recommended in the US at 4-6 years old), is almost exactly the opposite order of regions for under 5 mortality rates. This reciprocal observation is not seen for pneumococcal conjugate 3rd dose immunization coverage among 1-year olds. There is a weekly negative relationship between vaccination coverage for all three vaccines and the neonatal mortality rate.
+<br><br>
+
+## Doctor and Nurse/Midwife Density 
+```{r, echo=FALSE}
+med_stat <- gather(regions, key="measure", value="value", c("doctor_density11_19", "nurse_midwife_density11_19"))
+
+ggplot(med_stat, aes(x=member_state, y=value))+
+  geom_bar(stat='identity', aes(fill = factor(member_state))) +
+  facet_wrap(~ measure) +
+  coord_flip() +
+  theme(legend.position = "none") +
+  scale_fill_viridis_d(option = "magma") + 
+  labs(title = "Doctor and Nurse/Midwife Density") +
+  ylab("Density (Per 10,000 Population)") + xlab("Region")
+```
+<br><br>
+The density of doctors (per 10,000 population) is highest for the European region (43.2), then the region of the Americas (28.4), the Western Pacific region (18.9), the Eastern Mediterranean region (10.9), the Southeast Asia region (8.7), and finally, the African Region (2.8).
+<br><br>
+The density of nursing or midwife personnel (per 10,000 population) is highest for the region of the Americas (82.7), then the European region (77.8), the Western Pacific region (36.9), the Southeast Asia region (24.5), the Eastern Mediterranean region (16.4), and finally, the African Region (10.3).
+<br><br>
+
+## Sanitation
+```{r, echo=FALSE}
+sanitizing_stat <- gather(regions, key="measure", value="value", c("safe_drinking17", "sanitation17", "hand_washing17"))
+
+ggplot(sanitizing_stat, aes(x=member_state, y=value))+
+  geom_bar(stat='identity', aes(fill = factor(member_state))) +
+  facet_wrap(~ measure) +
+  coord_flip() +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = c("violet", "orange", "light yellow", "light green", "light blue", "dark blue")) +
+  labs(title = "Hand Washing, Safe Drinking, and Sanitation Services") +
+  ylab("Percent") + xlab("Region")
+```
+<br><br>
+The proportion of population using a hand-washing facility with soap and water is highest for the Eastern Mediterranean region (66%), then the Southeast Asia Region (60%), and finally, the African Region (28%). Data on the Western Pacific region, the region of the Americas, and the European region is not available.
+<br><br>
+The proportion of population using safely-managed drinking-water services is highest for the European region (92%), then the region of the Americas (79%), the Eastern Mediterranean region (56%), and finally, the African Region (29%). Data on the Western Pacific region and the Southeast Asia region is not available.
+<br><br>
+The proportion of population using safely-managed sanitation services is highest for the European region (68%), then the Western Pacific region (67%), the region of the Americas (49%), and finally, the African Region (20%). Data on the Southeast Asia region and the Eastern Mediterranean region is not available. Note: the proportion of missing observations for the whole variable, "sanitation17", is over 50%.
+<br><br>
+The pattern, or lack of pattern, of missing data is interesting. Despite the fact that all three of these categories deal with sanitation statistics, a different set of regions for each is missing values.
+<br><br>
+```{r, echo=FALSE}
+whs %>%
+  ggplot(aes(x = hand_washing17, y = healthy_life_both19)) +
+  geom_point() + 
+  labs(title = "Safe Drinking Water and Healthy Life Expectancy") +
+  xlab("% of Population Using Using A Hand-Washing Facility with Soap and Water") + ylab("Healthy Life Expectancy (In Years) at Birth")
+
+whs %>%
+  ggplot(aes(x = safe_drinking17, y = healthy_life_both19)) +
+  geom_point() + 
+  labs(title = "Safe Drinking Water and Healthy Life Expectancy") +
+  xlab("% of Population Using Safely-Managed Drinking-Water Services") + ylab("Healthy Life Expectancy (In Years) at Birth")
+```
+It makes sense that, when data is available, the European region, the region of the Americas, and the Western Pacific region have the highest percentages for all three variables, as they are the countries with the highest life expectancies and healthy life expectancies. While  access to sanitizing products/services cannot guarantee a long life expectancy, it contributes positively to overall health which, in turn, positively impacts life expectancy. There are also positive relationships between all three sanitation statistics and a healthy life expectancy at birth. No comparison was done with the "sanitation17" variable because over 53% of observations are missing in the original dataset.
+<br><br>
+
+## Pollution and Clean Technology
+```{r, echo=FALSE}
+regions %>%
+  ggplot(aes(x = member_state, y = fuels_tech19)) + 
+  geom_bar(stat='identity', aes(fill = factor(member_state))) +
+  coord_flip() + 
+  theme(legend.position = "none") +
+  scale_fill_viridis_d() + 
+  labs(title = "Population with Primary Reliance on Clean Fuels/Technology") +
+  ylab("Percent") + xlab("Region")
+
+regions %>%
+  ggplot(aes(x = member_state, y = particulate_matter16)) + 
+  geom_bar(stat='identity', aes(fill = factor(member_state))) +
+  coord_flip() + 
+  theme(legend.position = "none") +
+  scale_fill_viridis_d() + 
+  labs(title = "Concentrations of Fine Particulate Matter in Urban Areas") +
+  ylab("Annual Mean Concentration (µg/m^3)") + xlab("Region")
+```
+The region with the highest proportion of population with primary reliance on clean fuels and technology is the European region (96%), followed by the region of the Americas (92%), the Eastern Mediterranean region (74%), the Western Pacific region (67%), the Southeast Asia region (61%), and finally, the African region (19%).
+<br><br>
+The region with the highest annual mean concentrations of fine particulate matter (PM2.5) in urban areas (µg/m^3) is the Southeast Asia region (61.1), followed by the Eastern Mediterranean region (55.7), the Western Pacific region (39.4), the African region (38.8), the European region (13.0), and finally, the region of the Americas (10.8).
+
+## Household Expenditures on Health 
+```{r, echo=FALSE}
+health_exp_stat <- gather(regions, key="measure", value="value", c("over10_health_exp11_18", "over25_health_exp11_18"))
+
+ggplot(health_exp_stat, aes(x=member_state, y=value))+
+  geom_bar(stat='identity', aes(fill = factor(member_state))) +
+  facet_wrap(~ measure) +
+  coord_flip() +
+  theme(legend.position = "none") +
+  scale_fill_viridis_d() + 
+  labs(title = ">10% and > 25% of Total Household Income on Health") +
+  ylab("Percent") + xlab("Region")
+```
+<br><br>
+The region with the highest percent of the population with household expenditures on health being over 10% of total household expenditure or income is the Southeast Asia region (16.0%), then the Western Pacific region (15.9%), the Eastern Mediterranean region (11.7%), the region of the Americas (11.3%), the European region (7.4%), and finally, the African region (7.3%).
+<br><br>
+The region with the highest percent of the population with household expenditures on health being over 25% of total household expenditure or income is the Western Pacific region (4.2%), then the Southeast Asia region (3.8%), the Eastern Mediterranean region (1.9%), the region of the Americas and the African region (1.8%), and finally, the European region (1.2%). 
+<br><br>
+While it can be stated that within this data set, for example, there is a higher percent of of the Eastern African Region spending over 10% of household income on Health than percent of the European region, these data points cannot directly be correlated to which region spends the most amount of household income on health. There may be, for example, a larger percent of the African region spending less than 10% of household expenditures than the Eastern Mediterranean region. Additionally, it should be noted that while data for all 6 regions is available for these two variables, over 52% of the total observations are missing. For this reason, no variable-wide comparison should be done.
+<br><br>
+
+## Medical Research, Health Facilties, and Government Health Expenditures
+```{r, echo=FALSE}
+regions %>%
+  ggplot(aes(x = member_state, y = GGHED18)) + 
+  geom_bar(stat='identity', aes(fill = factor(member_state))) +
+  coord_flip() + 
+  theme(legend.position = "none") +
+  labs(title = "Government Health Expenditures") +
+  ylab("Percent") + xlab("Region")
+
+regions %>%
+  ggplot(aes(x = member_state, y = medical_research19)) + 
+  geom_bar(stat='identity', aes(fill = factor(member_state))) +
+  coord_flip() + 
+  theme(legend.position = "none") +
+  labs(title = "Assistance to Medical Research and Basic Health Sectors") +
+  ylab("US Dollar") + xlab("Region")
+```
+The region with the highest domestic general government health expenditure (GGHE-D) as percentage of general government expenditure (GGE) is the region of the Americas (13.9%), followed by the European region (12.5%), the Western Pacific region (10.0%), the Eastern Mediterranean region (8.6%), the Southeast Asia region (8.1%), and finally, the African region (6.8%).
+<br><br>
+The region with the highest total net official development assistance to medical research and basic health sectors per capita (US$), by recipient country is the African region (5.34), followed by the Eastern Mediterranean region (1.89), the European region (1.28), the Southeast Asia region (0.48), the region of the Americas (0.36), and finally, the Western Pacific region (0.32).
+<br><br>
+
+## Regional International Health Regulations Core Capacity Scores
+```{r, echo=FALSE}
+regions %>%
+  ggplot(aes(x = member_state, y = IHR_core_capacity20)) + 
+  geom_bar(stat='identity', aes(fill = factor(member_state))) +
+  coord_flip() + 
+  theme(legend.position = "none") +
+  scale_fill_manual(values = wes_palette("BottleRocket1", n = 6)) +
+  labs(title = "International Health Regulations Core Capacity Scores") +
+  ylab("Average of 13 Scores") + xlab("Region")
+```
+International Health Regulations core capacity scores were put in place to develop and maintain minimum core capacities for surveillance and response in order to early detect, assess, notify, and respond to any potential public health events of international concern. The 13 core capacities are: (1) Legislation and financing; (2) IHR Coordination and National Focal Point Functions; (3) Zoonotic events and the Human-Animal Health Interface; (4) Food safety; (5) Laboratory; (6) Surveillance; (7) Human resources; (8) National Health Emergency Framework; (9) Health Service Provision; (10) Risk communication; (11) Points of entry; (12) Chemical events; (13) Radiation emergencies.
+<br><br>
+The region with the highest average of 13 International Health Regulations core capacity scores is the European region (74), then the region of the Americas (72), the Western Pacific region (70), the Eastern Mediterranean region (67), the Southeast Asia region (63), and finally, the African region (48).
+
+## Top and Lowest International Health Regulations Core Capacity Scores
+```{r, echo=FALSE}
+# Top 5 Countries
+whs %>%
+  select(member_state, IHR_core_capacity20) %>%
+  filter(!is.na(IHR_core_capacity20)) %>%
+  arrange(desc(IHR_core_capacity20)) %>%
+  head(5)
+
+# Bottom 5 Countries
+whs %>%
+  select(member_state, IHR_core_capacity20) %>%
+  filter(!is.na(IHR_core_capacity20)) %>%
+  arrange(IHR_core_capacity20) %>%
+  head(5)
+```
+The 5 countries with the highest average of the 13 core capacity scores are Canada, El Salvador, Guyana, and the Russian Federation all with 100, and the Republic of Korea with 98. These countries correspond to and are found in the regions with the highest amount of top core capacity scores: the European region, the region of the Americas, and the Western Pacific region.
+<br><br>
+The 5 countries with the lowest average of the 13 core capacity scores are Niger with 10, Equatorial Guinea with 26, Djibouti and Sao Tome and Principe with 31, and the Central African Republic with 32. All 5 of these countries are located in the African region which has the lowest number of high core capacity scores by region.
+<br><br>
+
+## UHC Service Coverage Index 
+```{r, echo=FALSE}
+regions %>%
+  ggplot(aes(x = member_state, y = service_coverage17)) + 
+  geom_bar(stat='identity', aes(fill = factor(member_state))) +
+  coord_flip() + 
+  theme(legend.position = "none") +
+  labs(title = "UHC Service Coverage Index") +
+  ylab("Index (0 to 100)") + xlab("Region")
+```
+<br><br>
+The UHC service coverage index measures coverage of essential health services. It is reported on a unitless scale of 0 to 100, which is computed as the geometric mean of 14 tracer indicators of health service coverage which are organized by four components of service coverage: (1) Reproductive, maternal, newborn and child health (2) Infectious diseases (3) Noncommunicable diseases (4) Service capacity and access.
+<br><br>
+The region with the highest service coverage index is the region of the Americas (79), followed by the European and Western Pacific regions (77), the Eastern Mediterranean region (57), the Southeast Asia region (56), and finally, the African region (46).
+<br><br>
+
+## Top and Lowest UHC Service Coverage Indices
+```{r, echo=FALSE}
+# Top 5 Countries
+whs %>%
+  select(member_state, service_coverage17) %>%
+  filter(!is.na(service_coverage17)) %>%
+  arrange(desc(service_coverage17)) %>%
+  head(5)
+
+# Bottom 5 Countries
+whs %>%
+  select(member_state, service_coverage17) %>%
+  filter(!is.na(service_coverage17)) %>%
+  arrange(service_coverage17) %>%
+  head(5)
+```
+The 5 countries with the highest UHC service coverage indices are Canada (89), followed by Australia, New Zealand, Norway, and the United Kingdom (87). These countries correspond to and are found in the regions with the highest amount of top UNH service coverage indices: the European region, the region of the Americas, and the Western Pacific region.
+<br><br>
+The 5 countries with the lowest average of the 13 core capacity scores are Somalia (25), Chad and Madagascar (28), South Sudan (31), and the Central African Republic (33). All 5 of these countries are located in the African region which has the lowest UHC service coverage indices by region.
+<br><br>
+
+## Conclusion
+The WHO World Health Statistics 2021 data set was primarily used in this report to look at the distributions of certain health statistics across WHO member state regions. These health statistics fell into categories that affect health nationwide, community wide, and at the individual level. The standings of each region for any of the 18 categories explored were compared and occasionally, results between categories were noted on without drawing causal relationships. For example, the ranking of regions for each sanitation statistics were compared to the ranking of regions for healthy life expectancy at birth. A scatter plot was then created for each relationship, and though there are confounders in terms of what factors into a healthy life expectancy, something can be said about sanitation contributing to life expectancy in a positive way. Each subsection of the long form EDA was meant to explore health standards and policies throughout different regions of WHO member states, and comment on trends between those regions.
